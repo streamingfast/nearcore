@@ -217,6 +217,12 @@ impl Runtime {
         signed_transaction: &SignedTransaction,
         stats: &mut ApplyStats,
     ) -> Result<(Receipt, ExecutionOutcomeWithId), RuntimeError> {
+        sf::print(format!(
+            "PROCESS_TRANSACTION {apply_state:?} {trx:?}",
+            apply_state = apply_state,
+            trx = signed_transaction
+        ));
+
         let _span =
             tracing::debug_span!(target: "runtime", "Runtime::process_transaction").entered();
         near_metrics::inc_counter(&metrics::TRANSACTION_PROCESSED_TOTAL);
@@ -1276,19 +1282,25 @@ impl Runtime {
         // We first process local receipts. They contain staking, local contract calls, etc.
         for receipt in local_receipts.iter() {
             if total_gas_burnt < gas_limit {
+                sf::print(format!("BEGIN_DIRECT_RECEIPT {receipt:?}", receipt = receipt,));
+
                 // NOTE: We don't need to validate the local receipt, because it's just validated in
                 // the `verify_and_charge_transaction`.
                 process_receipt(&receipt, &mut state_update, &mut total_gas_burnt)?;
+                sf::print(format!("END_DIRECT_RECEIPT {receipt:?}", receipt = receipt));
             } else {
                 Self::delay_receipt(&mut state_update, &mut delayed_receipts_indices, receipt)?;
             }
         }
+
+        sf::print(format!("STOPPED_DIRECT_RECEIPT"));
 
         // Then we process the delayed receipts. It's a backlog of receipts from the past blocks.
         while delayed_receipts_indices.first_index < delayed_receipts_indices.next_available_index {
             if total_gas_burnt >= gas_limit {
                 break;
             }
+
             let key = TrieKey::DelayedReceipt { index: delayed_receipts_indices.first_index };
             let receipt: Receipt = get(&state_update, &key)?.ok_or_else(|| {
                 StorageError::StorageInconsistentState(format!(
@@ -1296,6 +1308,8 @@ impl Runtime {
                     delayed_receipts_indices.first_index
                 ))
             })?;
+
+            sf::print(format!("BEGIN_DELAYED_RECEIPT {receipt:?}", receipt = &receipt,));
 
             // Validating the delayed receipt. If it fails, it's likely the state is inconsistent.
             validate_receipt(&apply_state.config.wasm_config.limit_config, &receipt).map_err(
@@ -1311,7 +1325,11 @@ impl Runtime {
             // Math checked above: first_index is less than next_available_index
             delayed_receipts_indices.first_index += 1;
             process_receipt(&receipt, &mut state_update, &mut total_gas_burnt)?;
+
+            sf::print(format!("END_DELAYED_RECEIPT {receipt:?}", receipt = &receipt));
         }
+
+        sf::print(format!("STOPPED_DELAYED_RECEIPT"));
 
         // And then we process the new incoming receipts. These are receipts from other shards.
         for receipt in incoming_receipts.iter() {
@@ -1320,11 +1338,15 @@ impl Runtime {
             validate_receipt(&apply_state.config.wasm_config.limit_config, &receipt)
                 .map_err(RuntimeError::ReceiptValidationError)?;
             if total_gas_burnt < gas_limit {
+                sf::print(format!("BEGIN_SHARDED_RECEIPT {receipt:?}", receipt = &receipt,));
                 process_receipt(&receipt, &mut state_update, &mut total_gas_burnt)?;
+                sf::print(format!("END_DIRECT_RECEIPT {receipt:?}", receipt = receipt));
             } else {
                 Self::delay_receipt(&mut state_update, &mut delayed_receipts_indices, receipt)?;
             }
         }
+
+        sf::print(format!("STOPPED_SHARDED_RECEIPT"));
 
         if delayed_receipts_indices != initial_delayed_receipt_indices {
             set(&mut state_update, TrieKey::DelayedReceiptIndices, &delayed_receipts_indices);

@@ -27,6 +27,7 @@ near-primitives = { path = "../../core/primitives" }
 near-store = { path = "../../core/store" }
 near-metrics = { path = "../../core/metrics" }
 near-pool = { path = "../pool" }
+sf = { path = "../../sf" }
 
 delay-detector = { path = "../../tools/delay_detector", optional = true}
 

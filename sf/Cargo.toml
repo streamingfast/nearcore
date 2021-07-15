@@ -1,0 +1,10 @@
+[package]
+name = "sf"
+version = "1.2.0"
+authors = ["StreamingFast Team <hello@streamingfast.com>"]
+edition = "2018"
+
+[dependencies]
+lazy_static = "1.4"
+
+near-primitives = { path = "../core/primitives" }

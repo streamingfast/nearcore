@@ -2768,6 +2768,8 @@ impl<'a> ChainUpdate<'a> {
         prev_block: &Block,
         mode: ApplyChunksMode,
     ) -> Result<(), Error> {
+        sf::print(format!("APPLY_CHUNKS {block:?}", block = block));
+
         let challenges_result = self.verify_challenges(
             block.challenges(),
             block.header().epoch_id(),
@@ -2886,6 +2888,12 @@ impl<'a> ChainUpdate<'a> {
                             &prev_block.hash(),
                             shard_id,
                         )?;
+
+                    sf::print(format!(
+                        "BEFORE_APPLY_CHUNKS {shard_id:?} {tx_count}",
+                        shard_id = shard_id,
+                        tx_count = chunk.transactions().len()
+                    ));
 
                     // Apply transactions and receipts.
                     let apply_result = self

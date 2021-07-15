@@ -3023,6 +3023,7 @@ dependencies = [
  "num-rational",
  "rand 0.7.3",
  "serde",
+ "sf",
  "strum",
  "thiserror",
  "tracing",
@@ -3788,6 +3789,7 @@ dependencies = [
  "rayon",
  "serde",
  "serde_json",
+ "sf",
  "tempfile",
  "testlib",
  "thiserror",
@@ -5094,6 +5096,14 @@ dependencies = [
  "linked-hash-map",
  "serde",
  "yaml-rust",
+]
+
+[[package]]
+name = "sf"
+version = "1.2.0"
+dependencies = [
+ "lazy_static",
+ "near-primitives",
 ]
 
 [[package]]
