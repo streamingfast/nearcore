@@ -18,7 +18,7 @@ use near_client::{
     GetStateChangesInBlock, GetValidatorInfo, GetValidatorOrdered, Query, Status, TxStatus,
     TxStatusError, ViewClientActor,
 };
-pub use near_jsonrpc_client as client;
+pub use near_jsonrpc_client_old as client;
 use near_jsonrpc_primitives::errors::RpcError;
 use near_jsonrpc_primitives::message::{Message, Request};
 #[cfg(feature = "adversarial")]
