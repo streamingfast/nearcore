@@ -26,12 +26,14 @@ type Result<T> = ::std::result::Result<T, VMLogicError>;
 
 /// Gas counter (a part of VMlogic)
 pub struct GasCounter {
+    /// The following two fields must be put next to another to make sure
+    /// generated gas counting code can use and adjust them.
     /// The amount of gas that was irreversibly used for contract execution.
     burnt_gas: Gas,
-    /// Gas that was attached to the promises.
-    promises_gas: Gas,
     /// Gas limit for execution
     max_gas_burnt: Gas,
+    /// Gas that was attached to the promises.
+    promises_gas: Gas,
     /// Amount of prepaid gas, we can never burn more than prepaid amount
     prepaid_gas: Gas,
     /// If this is a view-only call.
@@ -122,6 +124,21 @@ impl GasCounter {
             self.burnt_gas = self.max_gas_burnt;
             Err(HostError::GasExceeded.into())
         }
+    }
+
+    /// Very special function to get the gas counter pointer for generated machine code.
+    /// Please do not use, unless fully understand Rust aliasing and other consequences.
+    /// Can be used to emit inlined code like `pay_wasm_gas()`, i.e.
+    ///    mov base, gas_counter_raw_ptr
+    ///    mov rax, [base]
+    ///    add rax, block_cost
+    ///    jo emit_integer_overflow
+    ///    cmp rax, [base + 8]
+    ///    jg emit_gas_exceeded
+    ///    mov [base], rax
+    pub fn gas_counter_raw_ptr(&mut self) -> *mut Gas {
+        use std::ptr;
+        ptr::addr_of_mut!(self.burnt_gas)
     }
 
     /// A helper function to pay a multiple of a cost.
