@@ -26,12 +26,14 @@ type Result<T> = ::std::result::Result<T, VMLogicError>;
 
 /// Gas counter (a part of VMlogic)
 pub struct GasCounter {
-    /// The following two fields must be put next to another to make sure
+    /// The following three fields must be put next to another to make sure
     /// generated gas counting code can use and adjust them.
     /// The amount of gas that was irreversibly used for contract execution.
     burnt_gas: Gas,
-    /// Gas limit for execution
+    /// Hard gas limit for execution
     max_gas_burnt: Gas,
+    /// Single WASM opcode cost
+    opcode_cost: Gas,
     /// Gas that was attached to the promises.
     promises_gas: Gas,
     /// Amount of prepaid gas, we can never burn more than prepaid amount
@@ -53,6 +55,7 @@ impl GasCounter {
     pub fn new(
         ext_costs_config: ExtCostsConfig,
         max_gas_burnt: Gas,
+        opcode_cost: u32,
         prepaid_gas: Gas,
         is_view: bool,
     ) -> Self {
@@ -60,8 +63,9 @@ impl GasCounter {
         Self {
             ext_costs_config,
             burnt_gas: 0,
-            promises_gas: 0,
             max_gas_burnt: min(max_gas_burnt, prepaid_gas),
+            opcode_cost: Gas::from(opcode_cost),
+            promises_gas: 0,
             prepaid_gas,
             is_view,
             profile: Default::default(),
@@ -113,7 +117,8 @@ impl GasCounter {
         self.profile.add_action_cost(action, value)
     }
 
-    pub fn pay_wasm_gas(&mut self, value: u64) -> Result<()> {
+    pub fn pay_wasm_gas(&mut self, opcodes: u32) -> Result<()> {
+        let value = Gas::from(opcodes) * self.opcode_cost;
         let new_burnt_gas =
             self.burnt_gas.checked_add(value).ok_or(HostError::IntegerOverflow)?;
         if new_burnt_gas <= self.max_gas_burnt
@@ -130,11 +135,13 @@ impl GasCounter {
     /// Please do not use, unless fully understand Rust aliasing and other consequences.
     /// Can be used to emit inlined code like `pay_wasm_gas()`, i.e.
     ///    mov base, gas_counter_raw_ptr
-    ///    mov rax, [base]
-    ///    add rax, block_cost
+    ///    mov rax, [base] ; current burnt gas
+    ///    mov rcx, [base + 16] ; opcode cost
+    ///    imul rcx, block_ops_count ; block cost
+    ///    add rax, rcx ; new burnt gas
     ///    jo emit_integer_overflow
-    ///    cmp rax, [base + 8]
-    ///    jg emit_gas_exceeded
+    ///    cmp rax, [base + 8] ; unsigned compare with burnt limit
+    ///    ja emit_gas_exceeded
     ///    mov [base], rax
     pub fn gas_counter_raw_ptr(&mut self) -> *mut Gas {
         use std::ptr;
@@ -240,7 +247,7 @@ mod tests {
 
     #[test]
     fn test_deduct_gas() {
-        let mut counter = GasCounter::new(ExtCostsConfig::default(), 10, 10, false);
+        let mut counter = GasCounter::new(ExtCostsConfig::default(), 10, 1, 10, false);
         counter.deduct_gas(5, 10).expect("deduct_gas should work");
         assert_eq!(counter.burnt_gas(), 5);
         assert_eq!(counter.used_gas(), 10);
@@ -249,7 +256,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn test_prepaid_gas_min() {
-        let mut counter = GasCounter::new(ExtCostsConfig::default(), 100, 10, false);
+        let mut counter = GasCounter::new(ExtCostsConfig::default(), 100, 1, 10, false);
         counter.deduct_gas(10, 5).unwrap();
     }
 }
