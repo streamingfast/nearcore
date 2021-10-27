@@ -299,7 +299,7 @@ pub fn read_with_cache<'a, T: BorshDeserialize + 'a>(
 }
 
 pub fn create_store(path: &Path) -> Arc<Store> {
-    let db = Arc::pin(RocksDB::new_read_only(path).expect("Failed to open the database"));
+    let db = Arc::pin(RocksDB::new(path).expect("Failed to open the database"));
     Arc::new(Store::new(db))
 }
 

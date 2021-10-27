@@ -697,7 +697,7 @@ impl RocksDB {
         })
     }
 
-    pub fn new_read_only<P: AsRef<std::path::Path>>(path: P) -> Result<Self, DBError> {
+    fn new_read_only<P: AsRef<std::path::Path>>(path: P) -> Result<Self, DBError> {
         RocksDBOptions::default().read_only(path)
     }
 
