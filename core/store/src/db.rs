@@ -417,7 +417,7 @@ impl RocksDBOptions {
                 })
                 .collect()
         });
-        let db = DB::open_cf_descriptors(&options, path, cf_descriptors)?;
+        let db = DB::open_cf_for_read_only(&options, path, cf_descriptors)?;
         #[cfg(feature = "single_thread_rocksdb")]
         {
             // These have to be set after open db
