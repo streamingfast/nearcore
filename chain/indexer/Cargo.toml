@@ -19,5 +19,5 @@ nearcore = { path = "../../nearcore" }
 near-client = { path = "../client" }
 near-chain-configs = { path = "../../core/chain-configs" }
 near-crypto = { path = "../../core/crypto" }
-near-primitives = { path = "../../core/primitives" }
+near-primitives = { path = "../../core/primitives", features = ["protocol_feature_block_header_v3"]}
 node-runtime = { path = "../../runtime/runtime" }
