@@ -61,12 +61,8 @@ pub struct BlockHeaderInnerRest {
 
     /// Last block that has full BFT finality
     pub last_final_block: CryptoHash,
-    #[borsh_skip]
-    pub last_final_block_height: BlockHeight,
     /// Last block that has doomslug finality
     pub last_ds_final_block: CryptoHash,
-    #[borsh_skip]
-    pub last_ds_final_block_height: BlockHeight,
 
     /// All the approvals included in this block
     pub approvals: Vec<Option<Signature>>,
@@ -101,12 +97,8 @@ pub struct BlockHeaderInnerRestV2 {
 
     /// Last block that has full BFT finality
     pub last_final_block: CryptoHash,
-    #[borsh_skip]
-    pub last_final_block_height: BlockHeight,
     /// Last block that has doomslug finality
     pub last_ds_final_block: CryptoHash,
-    #[borsh_skip]
-    pub last_ds_final_block_height: BlockHeight,
 
     /// All the approvals included in this block
     pub approvals: Vec<Option<Signature>>,
@@ -145,12 +137,8 @@ pub struct BlockHeaderInnerRestV3 {
 
     /// Last block that has full BFT finality
     pub last_final_block: CryptoHash,
-    #[borsh_skip]
-    pub last_final_block_height: BlockHeight,
     /// Last block that has doomslug finality
     pub last_ds_final_block: CryptoHash,
-    #[borsh_skip]
-    pub last_ds_final_block_height: BlockHeight,
 
     /// The ordinal of the Block on the Canonical Chain
     pub block_ordinal: NumBlocks,
@@ -366,9 +354,7 @@ impl BlockHeader {
         challenges_result: ChallengesResult,
         signer: &dyn ValidatorSigner,
         last_final_block: CryptoHash,
-        last_final_block_height: BlockHeight,
         last_ds_final_block: CryptoHash,
-        last_ds_final_block_height: BlockHeight,
         #[cfg(feature = "protocol_feature_block_header_v3")] epoch_sync_data_hash: Option<
             CryptoHash,
         >,
@@ -410,9 +396,7 @@ impl BlockHeader {
                 total_supply,
                 challenges_result,
                 last_final_block,
-                last_final_block_height,
                 last_ds_final_block,
-                last_ds_final_block_height,
                 approvals,
                 latest_protocol_version: PROTOCOL_VERSION,
             };
@@ -446,9 +430,7 @@ impl BlockHeader {
                 total_supply,
                 challenges_result,
                 last_final_block,
-                last_final_block_height,
                 last_ds_final_block,
-                last_ds_final_block_height,
                 approvals,
                 latest_protocol_version: PROTOCOL_VERSION,
             };
@@ -482,9 +464,7 @@ impl BlockHeader {
                     total_supply,
                     challenges_result,
                     last_final_block,
-                    last_final_block_height,
                     last_ds_final_block,
-                    last_ds_final_block_height,
                     prev_height,
                     epoch_sync_data_hash,
                     approvals,
@@ -550,9 +530,7 @@ impl BlockHeader {
                 total_supply: initial_total_supply,
                 challenges_result: vec![],
                 last_final_block: CryptoHash::default(),
-                last_final_block_height: 0,
                 last_ds_final_block: CryptoHash::default(),
-                last_ds_final_block_height: 0,
                 approvals: vec![],
                 latest_protocol_version: genesis_protocol_version,
             };
@@ -583,9 +561,7 @@ impl BlockHeader {
                 total_supply: initial_total_supply,
                 challenges_result: vec![],
                 last_final_block: CryptoHash::default(),
-                last_final_block_height: 0,
                 last_ds_final_block: CryptoHash::default(),
-                last_ds_final_block_height: 0,
                 approvals: vec![],
                 latest_protocol_version: genesis_protocol_version,
             };
@@ -619,9 +595,7 @@ impl BlockHeader {
                     total_supply: initial_total_supply,
                     challenges_result: vec![],
                     last_final_block: CryptoHash::default(),
-                    last_final_block_height: 0,
                     last_ds_final_block: CryptoHash::default(),
-                    last_ds_final_block_height: 0,
                     prev_height: 0,
                     epoch_sync_data_hash: None, // Epoch Sync cannot be executed up to Genesis
                     approvals: vec![],
@@ -873,32 +847,12 @@ impl BlockHeader {
     }
 
     #[inline]
-    pub fn last_final_block_height(&self) -> BlockHeight {
-        match self {
-            BlockHeader::BlockHeaderV1(header) => header.inner_rest.last_final_block_height,
-            BlockHeader::BlockHeaderV2(header) => header.inner_rest.last_final_block_height,
-            #[cfg(feature = "protocol_feature_block_header_v3")]
-            BlockHeader::BlockHeaderV3(header) => header.inner_rest.last_final_block_height,
-        }
-    }
-
-    #[inline]
     pub fn last_ds_final_block(&self) -> &CryptoHash {
         match self {
             BlockHeader::BlockHeaderV1(header) => &header.inner_rest.last_ds_final_block,
             BlockHeader::BlockHeaderV2(header) => &header.inner_rest.last_ds_final_block,
             #[cfg(feature = "protocol_feature_block_header_v3")]
             BlockHeader::BlockHeaderV3(header) => &header.inner_rest.last_ds_final_block,
-        }
-    }
-
-    #[inline]
-    pub fn last_ds_final_block_height(&self) -> BlockHeight {
-        match self {
-            BlockHeader::BlockHeaderV1(header) => header.inner_rest.last_ds_final_block_height,
-            BlockHeader::BlockHeaderV2(header) => header.inner_rest.last_ds_final_block_height,
-            #[cfg(feature = "protocol_feature_block_header_v3")]
-            BlockHeader::BlockHeaderV3(header) => header.inner_rest.last_ds_final_block_height,
         }
     }
 

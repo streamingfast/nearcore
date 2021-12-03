@@ -247,17 +247,14 @@ impl Block {
         let (vrf_value, vrf_proof) = signer.compute_vrf_with_proof(prev.random_value().as_ref());
         let random_value = hash(vrf_value.0.as_ref());
 
-        let (last_ds_final_block, last_ds_final_block_height) = if height == prev.height() + 1 {
-            (prev.hash(), prev.height())
-        } else {
-            (prev.last_ds_final_block(), prev.last_ds_final_block_height())
-        };
+        let last_ds_final_block =
+            if height == prev.height() + 1 { prev.hash() } else { prev.last_ds_final_block() };
 
-        let (last_final_block, last_final_block_height) =
+        let last_final_block =
             if height == prev.height() + 1 && prev.last_ds_final_block() == prev.prev_hash() {
-                (prev.prev_hash(), prev.height())
+                prev.prev_hash()
             } else {
-                (prev.last_final_block(), prev.last_final_block_height())
+                prev.last_final_block()
             };
 
         #[cfg(feature = "protocol_feature_block_header_v3")]
@@ -292,9 +289,7 @@ impl Block {
             challenges_result,
             signer,
             last_final_block.clone(),
-            last_final_block_height.clone(),
             last_ds_final_block.clone(),
-            last_ds_final_block_height.clone(),
             #[cfg(feature = "protocol_feature_block_header_v3")]
             epoch_sync_data_hash,
             approvals,
