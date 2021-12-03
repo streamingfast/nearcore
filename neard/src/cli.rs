@@ -2,6 +2,7 @@ use super::{DEFAULT_HOME, NEARD_VERSION, NEARD_VERSION_STRING, PROTOCOL_VERSION}
 use clap::{AppSettings, Clap};
 use futures::future::FutureExt;
 use near_primitives::types::{Gas, NumSeats, NumShards};
+use near_state_viewer::StateViewerSubCommand;
 use nearcore::get_store_path;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
@@ -57,16 +58,20 @@ impl NeardCmd {
                 info!(target: "neard", "Removing all data and config from {}", home_dir.to_string_lossy());
                 fs::remove_dir_all(home_dir).expect("Removing data and config failed.");
             }
+            NeardSubCommand::StateViewer(cmd) => {
+                cmd.run(&home_dir);
+            }
         }
     }
 }
 
 #[derive(Clap, Debug)]
 struct NeardOpts {
-    /// Verbose logging.
-    #[clap(long)]
+    /// Sets verbose logging for the given target, or for all targets
+    /// if "debug" is given.
+    #[clap(long, name = "target")]
     verbose: Option<String>,
-    /// Directory for config and data (default "~/.near").
+    /// Directory for config and data.
     #[clap(long, parse(from_os_str), default_value_os = DEFAULT_HOME.as_os_str())]
     home: PathBuf,
 }
@@ -97,6 +102,9 @@ pub(super) enum NeardSubCommand {
     /// config)
     #[clap(name = "unsafe_reset_data")]
     UnsafeResetData,
+    /// View DB state.
+    #[clap(name = "view_state")]
+    StateViewer(StateViewerSubCommand),
 }
 
 #[derive(Clap)]
