@@ -50,7 +50,7 @@ impl RuntimeConfigStore {
             store.insert(0, Arc::new(config.clone()));
 
             config.storage_amount_per_byte = 10u128.pow(19);
-            store.insert(42, Arc::new(config.clone()));
+            store.insert(42, Arc::new(config));
         }
 
         Self { store }
@@ -118,7 +118,7 @@ mod tests {
             "97UzHtVFBc4235jdur3DgNSUGNfGQfzRDLmAkYdZ19Re",
             "C6uw6BoeXr3KoKpVP34hBA7TqoywMbwMtJgqbTpPCiSB",
             "2cuq2HvuHT7Z27LUbgEtMxP2ejqrHK34J2V1GL1joiMn",
-            "Yov9YJ5wdLGy4ueKxX2xQZXUSswEKs2zcEwEZYNRcXK",
+            "HFetcNKaC5s8Mj7bQz7jGMF7Rsvtuc3kjZRevWQ334n4",
         ];
         let actual_hashes = CONFIGS
             .iter()

@@ -164,7 +164,6 @@
       "max_gas_burnt_view": 200000000000000,
       "max_stack_height": 16384,
       "stack_limiter_version": 1,
-      "legacy_stack_instrumentation": false,
       "initial_memory_pages": 1024,
       "max_memory_pages": 2048,
       "registers_memory_limit": 1073741824,

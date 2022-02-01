@@ -50,7 +50,7 @@ impl Wasmer2Memory {
     ) -> Result<Self, VMError> {
         Ok(Wasmer2Memory(
             Memory::new(
-                &store,
+                store,
                 MemoryType::new(Pages(initial_memory_pages), Some(Pages(max_memory_pages)), false),
             )
             .expect("TODO creating memory cannot fail"),
@@ -113,7 +113,7 @@ impl IntoVMError for wasmer::RuntimeError {
         let error_msg = self.message();
         let trap_code = self.clone().to_trap();
         if let Ok(e) = self.downcast::<VMLogicError>() {
-            return (&e).into();
+            return e.into();
         }
         // If we panic here - it means we encountered an issue in Wasmer.
         let trap_code = trap_code.unwrap_or_else(|| panic!("Unknown error: {}", error_msg));
@@ -227,7 +227,7 @@ fn run_method(
     let instance = {
         let _span = tracing::debug_span!(target: "vm", "run_method/instantiate").entered();
         Instance::new_with_config(
-            &module,
+            module,
             unsafe {
                 InstanceConfig::new_with_counter(
                     logic.gas_counter_pointer() as *mut wasmer_types::FastGasCounter
@@ -289,7 +289,7 @@ impl Wasmer2Config {
 //  major version << 6
 //  minor version
 const WASMER2_CONFIG: Wasmer2Config = Wasmer2Config {
-    seed: (1 << 10) | (3 << 6) | 0,
+    seed: (1 << 10) | (4 << 6) | 1,
     engine: WasmerEngine::Universal,
     compiler: WasmerCompiler::Singlepass,
 };
@@ -304,7 +304,24 @@ pub(crate) fn default_wasmer2_store() -> Store {
     let compiler = Singlepass::new();
     // We only support universal engine at the moment.
     assert_eq!(WASMER2_CONFIG.engine, WasmerEngine::Universal);
-    let engine = wasmer::Universal::new(compiler).features(WASMER_FEATURES).engine();
+    let target_features = if cfg!(feature = "no_cpu_compatibility_checks") {
+        let mut fs = wasmer::CpuFeature::set();
+        // These features should be sufficient to run the single pass compiler.
+        fs.insert(wasmer::CpuFeature::SSE2);
+        fs.insert(wasmer::CpuFeature::SSE3);
+        fs.insert(wasmer::CpuFeature::SSSE3);
+        fs.insert(wasmer::CpuFeature::SSE41);
+        fs.insert(wasmer::CpuFeature::SSE42);
+        fs.insert(wasmer::CpuFeature::POPCNT);
+        fs.insert(wasmer::CpuFeature::AVX);
+        fs
+    } else {
+        wasmer::CpuFeature::for_host()
+    };
+    let engine = wasmer::Universal::new(compiler)
+        .features(WASMER_FEATURES)
+        .target(wasmer::Target::new(wasmer::Triple::host(), target_features))
+        .engine();
     Store::new(&engine)
 }
 
@@ -343,9 +360,9 @@ pub(crate) fn run_wasmer2_module<'a>(
         current_protocol_version,
     );
 
-    let import = imports::build_wasmer2(store, memory_copy, &mut logic, current_protocol_version);
+    let import = imports::wasmer2::build(store, memory_copy, &mut logic, current_protocol_version);
 
-    if let Err(e) = check_method(&module, method_name) {
+    if let Err(e) = check_method(module, method_name) {
         return (None, Some(e));
     }
 
@@ -396,7 +413,7 @@ impl crate::runner::VM for Wasmer2VM {
 
         let store = default_wasmer2_store();
         let module =
-            cache::wasmer2_cache::compile_module_cached_wasmer2(&code, wasm_config, cache, &store);
+            cache::wasmer2_cache::compile_module_cached_wasmer2(code, wasm_config, cache, &store);
         let module = match into_vm_result(module) {
             Ok(it) => it,
             Err(err) => return (None, Some(err)),
@@ -432,7 +449,7 @@ impl crate::runner::VM for Wasmer2VM {
         }
 
         let import_object =
-            imports::build_wasmer2(&store, memory_copy, &mut logic, current_protocol_version);
+            imports::wasmer2::build(&store, memory_copy, &mut logic, current_protocol_version);
 
         if let Err(e) = check_method(&module, method_name) {
             return (None, Some(e));
