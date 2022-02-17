@@ -5,6 +5,8 @@ use clap::{AppSettings, Clap};
 use near_chain_configs::GenesisValidationMode;
 use near_logger_utils::init_integration_logger;
 use near_primitives::account::id::AccountId;
+use near_primitives::hash::CryptoHash;
+use near_primitives::sharding::ChunkHash;
 use near_primitives::types::{BlockHeight, ShardId};
 use near_primitives::version::{DB_VERSION, PROTOCOL_VERSION};
 use near_store::{create_store, Store};
@@ -12,7 +14,6 @@ use nearcore::{get_default_home, get_store_path, load_config, NearConfig};
 use once_cell::sync::Lazy;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
-use std::sync::Arc;
 
 static DEFAULT_HOME: Lazy<PathBuf> = Lazy::new(|| get_default_home());
 
@@ -97,6 +98,12 @@ pub enum StateViewerSubCommand {
     /// Dump stats for the RocksDB storage.
     #[clap(name = "rocksdb_stats")]
     RocksDBStats(RocksDBStatsCmd),
+    #[clap(name = "receipts")]
+    Receipts(ReceiptsCmd),
+    #[clap(name = "chunks")]
+    Chunks(ChunksCmd),
+    #[clap(name = "partial_chunks")]
+    PartialChunks(PartialChunksCmd),
 }
 
 impl StateViewerSubCommand {
@@ -117,6 +124,9 @@ impl StateViewerSubCommand {
             StateViewerSubCommand::DumpAccountStorage(cmd) => cmd.run(home_dir, near_config, store),
             StateViewerSubCommand::EpochInfo(cmd) => cmd.run(home_dir, near_config, store),
             StateViewerSubCommand::RocksDBStats(cmd) => cmd.run(home_dir),
+            StateViewerSubCommand::Receipts(cmd) => cmd.run(near_config, store),
+            StateViewerSubCommand::Chunks(cmd) => cmd.run(near_config, store),
+            StateViewerSubCommand::PartialChunks(cmd) => cmd.run(near_config, store),
         }
     }
 }
@@ -140,7 +150,7 @@ pub struct DumpStateCmd {
 }
 
 impl DumpStateCmd {
-    pub fn run(self, home_dir: &Path, near_config: NearConfig, store: Arc<Store>) {
+    pub fn run(self, home_dir: &Path, near_config: NearConfig, store: Store) {
         dump_state(self.height, self.stream, self.file, home_dir, near_config, store);
     }
 }
@@ -154,7 +164,7 @@ pub struct ChainCmd {
 }
 
 impl ChainCmd {
-    pub fn run(self, home_dir: &Path, near_config: NearConfig, store: Arc<Store>) {
+    pub fn run(self, home_dir: &Path, near_config: NearConfig, store: Store) {
         print_chain(self.start_index, self.end_index, home_dir, near_config, store);
     }
 }
@@ -168,7 +178,7 @@ pub struct ReplayCmd {
 }
 
 impl ReplayCmd {
-    pub fn run(self, home_dir: &Path, near_config: NearConfig, store: Arc<Store>) {
+    pub fn run(self, home_dir: &Path, near_config: NearConfig, store: Store) {
         replay_chain(self.start_index, self.end_index, home_dir, near_config, store);
     }
 }
@@ -187,10 +197,12 @@ pub struct ApplyRangeCmd {
     csv_file: Option<PathBuf>,
     #[clap(long)]
     only_contracts: bool,
+    #[clap(long)]
+    sequential: bool,
 }
 
 impl ApplyRangeCmd {
-    pub fn run(self, home_dir: &Path, near_config: NearConfig, store: Arc<Store>) {
+    pub fn run(self, home_dir: &Path, near_config: NearConfig, store: Store) {
         apply_range(
             self.start_index,
             self.end_index,
@@ -201,6 +213,7 @@ impl ApplyRangeCmd {
             near_config,
             store,
             self.only_contracts,
+            self.sequential,
         );
     }
 }
@@ -214,7 +227,7 @@ pub struct ApplyCmd {
 }
 
 impl ApplyCmd {
-    pub fn run(self, home_dir: &Path, near_config: NearConfig, store: Arc<Store>) {
+    pub fn run(self, home_dir: &Path, near_config: NearConfig, store: Store) {
         apply_block_at_height(self.height, self.shard_id, home_dir, near_config, store);
     }
 }
@@ -230,7 +243,7 @@ pub struct ViewChainCmd {
 }
 
 impl ViewChainCmd {
-    pub fn run(self, near_config: NearConfig, store: Arc<Store>) {
+    pub fn run(self, near_config: NearConfig, store: Store) {
         view_chain(self.height, self.block, self.chunk, near_config, store);
     }
 }
@@ -244,7 +257,7 @@ pub struct DumpCodeCmd {
 }
 
 impl DumpCodeCmd {
-    pub fn run(self, home_dir: &Path, near_config: NearConfig, store: Arc<Store>) {
+    pub fn run(self, home_dir: &Path, near_config: NearConfig, store: Store) {
         dump_code(self.account_id, &self.output, home_dir, near_config, store);
     }
 }
@@ -262,7 +275,7 @@ pub struct DumpAccountStorageCmd {
 }
 
 impl DumpAccountStorageCmd {
-    pub fn run(self, home_dir: &Path, near_config: NearConfig, store: Arc<Store>) {
+    pub fn run(self, home_dir: &Path, near_config: NearConfig, store: Store) {
         dump_account_storage(
             self.account_id,
             self.storage_key,
@@ -284,7 +297,7 @@ pub struct EpochInfoCmd {
 }
 
 impl EpochInfoCmd {
-    pub fn run(self, home_dir: &Path, near_config: NearConfig, store: Arc<Store>) {
+    pub fn run(self, home_dir: &Path, near_config: NearConfig, store: Store) {
         print_epoch_info(
             self.epoch_selection,
             self.validator_account_id.map(|s| AccountId::from_str(&s).unwrap()),
@@ -304,6 +317,44 @@ pub struct RocksDBStatsCmd {
 
 impl RocksDBStatsCmd {
     pub fn run(self, home_dir: &Path) {
-        get_rocksdb_stats(home_dir, self.file).expect("Couldn't get RocksDB stats")
+        get_rocksdb_stats(home_dir, self.file).expect("Couldn't get RocksDB stats");
+    }
+}
+
+#[derive(Clap)]
+pub struct ReceiptsCmd {
+    #[clap(long)]
+    receipt_id: String,
+}
+
+impl ReceiptsCmd {
+    pub fn run(self, near_config: NearConfig, store: Store) {
+        get_receipt(CryptoHash::from_str(&self.receipt_id).unwrap(), near_config, store)
+    }
+}
+
+#[derive(Clap)]
+pub struct ChunksCmd {
+    #[clap(long)]
+    chunk_hash: String,
+}
+
+impl ChunksCmd {
+    pub fn run(self, near_config: NearConfig, store: Store) {
+        let chunk_hash = ChunkHash::from(CryptoHash::from_str(&self.chunk_hash).unwrap());
+        get_chunk(chunk_hash, near_config, store)
+    }
+}
+#[derive(Clap)]
+pub struct PartialChunksCmd {
+    #[clap(long)]
+    partial_chunk_hash: String,
+}
+
+impl PartialChunksCmd {
+    pub fn run(self, near_config: NearConfig, store: Store) {
+        let partial_chunk_hash =
+            ChunkHash::from(CryptoHash::from_str(&self.partial_chunk_hash).unwrap());
+        get_partial_chunk(partial_chunk_hash, near_config, store)
     }
 }

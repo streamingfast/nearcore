@@ -1,6 +1,7 @@
 use crate::config::GasMetric;
 use crate::gas_cost::GasCost;
-use crate::vm_estimator::{create_context, least_squares_method};
+use crate::least_squares::least_squares_method;
+use crate::vm_estimator::create_context;
 use near_primitives::config::VMConfig;
 use near_primitives::contract::ContractCode;
 use near_primitives::runtime::config_store::RuntimeConfigStore;
@@ -138,7 +139,6 @@ pub fn compute_gas_metering_cost(
     repeats: i32,
     contract: &ContractCode,
 ) -> u64 {
-    let runtime = vm_kind.runtime().expect("runtime has not been enabled");
     let workdir = tempfile::Builder::new().prefix("runtime_testbed").tempdir().unwrap();
     let store = create_store(&get_store_path(workdir.path()));
     let cache_store = Arc::new(StoreCompiledContractCache { store });
@@ -146,6 +146,7 @@ pub fn compute_gas_metering_cost(
     let config_store = RuntimeConfigStore::new(None);
     let runtime_config = config_store.get_config(PROTOCOL_VERSION).as_ref();
     let vm_config_gas = runtime_config.wasm_config.clone();
+    let runtime = vm_kind.runtime(vm_config_gas).expect("runtime has not been enabled");
     let fees = runtime_config.transaction_costs.clone();
     let mut fake_external = MockedExternal::new();
     let fake_context = create_context(vec![]);
@@ -157,7 +158,6 @@ pub fn compute_gas_metering_cost(
         "hello",
         &mut fake_external,
         fake_context.clone(),
-        &vm_config_gas,
         &fees,
         &promise_results,
         PROTOCOL_VERSION,
@@ -177,7 +177,6 @@ pub fn compute_gas_metering_cost(
             "hello",
             &mut fake_external,
             fake_context.clone(),
-            &vm_config_gas,
             &fees,
             &promise_results,
             PROTOCOL_VERSION,
@@ -188,12 +187,12 @@ pub fn compute_gas_metering_cost(
     let total_raw_with_gas = start.elapsed().to_gas();
 
     let vm_config_no_gas = VMConfig::free();
+    let runtime = vm_kind.runtime(vm_config_no_gas).expect("runtime has not been enabled");
     let result = runtime.run(
         contract,
         "hello",
         &mut fake_external,
         fake_context.clone(),
-        &vm_config_no_gas,
         &fees,
         &promise_results,
         PROTOCOL_VERSION,
@@ -207,7 +206,6 @@ pub fn compute_gas_metering_cost(
             "hello",
             &mut fake_external,
             fake_context.clone(),
-            &vm_config_no_gas,
             &fees,
             &promise_results,
             PROTOCOL_VERSION,

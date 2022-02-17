@@ -4,7 +4,7 @@ use near_primitives::time::Clock;
 
 use near_chain::test_utils::KeyValueRuntime;
 use near_chain::types::{RuntimeAdapter, Tip};
-use near_chain::ChainStore;
+use near_chain::{Chain, ChainStore};
 use near_crypto::KeyType;
 use near_network::test_utils::MockPeerManagerAdapter;
 use near_primitives::block::BlockHeader;
@@ -41,8 +41,7 @@ impl Default for SealsManagerTestFixture {
         let store = near_store::test_utils::create_test_store();
         // 12 validators, 3 shards => 4 validators per shard
         let validators = make_validators(12);
-        let mock_runtime =
-            KeyValueRuntime::new_with_validators(Arc::clone(&store), validators, 1, 3, 5);
+        let mock_runtime = KeyValueRuntime::new_with_validators(store.clone(), validators, 1, 3, 5);
 
         let mock_parent_hash = CryptoHash::default();
         let mock_height: BlockHeight = 1;
@@ -91,7 +90,7 @@ impl Default for SealsManagerTestFixture {
 }
 
 impl SealsManagerTestFixture {
-    fn store_block_header(store: Arc<Store>, header: BlockHeader) {
+    fn store_block_header(store: Store, header: BlockHeader) {
         let mut chain_store = ChainStore::new(store, header.height());
         let mut update = chain_store.store_update();
         update.save_block_header(header).unwrap();
@@ -132,7 +131,7 @@ impl SealsManagerTestFixture {
     }
 }
 
-pub struct ChunkForwardingTestFixture {
+pub struct ChunkTestFixture {
     pub mock_runtime: Arc<KeyValueRuntime>,
     pub mock_network: Arc<MockPeerManagerAdapter>,
     pub chain_store: ChainStore,
@@ -145,19 +144,19 @@ pub struct ChunkForwardingTestFixture {
     pub rs: ReedSolomonWrapper,
 }
 
-impl Default for ChunkForwardingTestFixture {
+impl Default for ChunkTestFixture {
     fn default() -> Self {
         Self::new(false)
     }
 }
 
-impl ChunkForwardingTestFixture {
+impl ChunkTestFixture {
     pub fn new(orphan_chunk: bool) -> Self {
         let store = near_store::test_utils::create_test_store();
         // 12 validators, 3 shards => 4 validators per shard
         let validators = make_validators(12);
         let mock_runtime = Arc::new(KeyValueRuntime::new_with_validators(
-            Arc::clone(&store),
+            store.clone(),
             validators.clone(),
             1,
             3,
@@ -219,7 +218,7 @@ impl ChunkForwardingTestFixture {
         );
         let receipts = Vec::new();
         let shard_layout = mock_runtime.get_shard_layout(&EpochId::default()).unwrap();
-        let receipts_hashes = mock_runtime.build_receipts_hashes(&receipts, &shard_layout);
+        let receipts_hashes = Chain::build_receipts_hashes(&receipts, &shard_layout);
         let (receipts_root, _) = merkle::merklize(&receipts_hashes);
         let (mock_chunk, mock_merkles) = producer_shard_manager
             .create_encoded_shard_chunk(
@@ -256,7 +255,7 @@ impl ChunkForwardingTestFixture {
             mock_chunk.create_partial_encoded_chunk(all_part_ords, Vec::new(), &mock_merkles);
         let chain_store = ChainStore::new(store, 0);
 
-        ChunkForwardingTestFixture {
+        ChunkTestFixture {
             mock_runtime,
             mock_network,
             chain_store,
