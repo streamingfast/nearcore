@@ -250,6 +250,24 @@ pub(crate) struct VMArtifact {
     // There are two outstanding tasks that we may want to resolve which will allow removing this
     // specific field: first is removing the in-memory cache (and/or making sure that the VM
     // lifetime outlives the VM cache). The second is removing the allocations in question – those
+    // allocate data such as trampolines and should only occur when an instantiation happens.
+    _engine: UniversalEngine,
+}
+
+impl VMArtifact {
+    pub(crate) fn artifact(&self) -> &dyn wasmer_engine::Artifact {
+        &*self.artifact
+    }
+}
+
+#[derive(loupe::MemoryUsage)]
+pub(crate) struct Wasmer2VM {
+    #[loupe(skip)]
+    config: VMConfig,
+    engine: UniversalEngine,
+}
+
+impl Wasmer2VM {
     pub(crate) fn new_for_target(config: VMConfig, target: wasmer_compiler::Target) -> Self {
         // We only support singlepass compiler at the moment.
         assert_eq!(WASMER2_CONFIG.compiler, WasmerCompiler::Singlepass);
@@ -516,15 +534,6 @@ impl crate::runner::VM for Wasmer2VM {
             %method_name
         )
         .entered();
-        // NaN behavior is deterministic as of now: https://github.com/wasmerio/wasmer/issues/1269
-        // So doesn't require x86. However, when it is on x86, AVX is required:
-        // https://github.com/wasmerio/wasmer/issues/1567
-        #[cfg(not(feature = "no_cpu_compatibility_checks"))]
-        if (cfg!(target_arch = "x86") || !cfg!(target_arch = "x86_64"))
-            && !is_x86_feature_detected!("avx")
-        {
-            panic!("AVX support is required in order to run Wasmer VM Singlepass backend.");
-        }
 
         if method_name.is_empty() {
             return (
