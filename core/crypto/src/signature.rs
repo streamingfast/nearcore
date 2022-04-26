@@ -158,6 +158,12 @@ impl From<[u8; ed25519_dalek::PUBLIC_KEY_LENGTH]> for ED25519PublicKey {
     }
 }
 
+impl From<ED25519PublicKey> for [u8; ed25519_dalek::PUBLIC_KEY_LENGTH] {
+    fn from(data: ED25519PublicKey) -> [u8; ed25519_dalek::PUBLIC_KEY_LENGTH] {
+        data.0
+    }
+}
+
 impl TryFrom<&[u8]> for ED25519PublicKey {
     type Error = crate::errors::ParseKeyError;
 
