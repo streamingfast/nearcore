@@ -61,6 +61,7 @@ fn main() -> Result<()> {
         near_config.client_config.max_gas_burnt_view,
         None,
         DEFAULT_GC_NUM_EPOCHS_TO_KEEP,
+        Default::default()
     );
 
     let mut receipts_missing = Vec::<Receipt>::new();
