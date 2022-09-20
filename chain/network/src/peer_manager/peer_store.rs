@@ -1,6 +1,7 @@
 use crate::config;
 use crate::store;
 use anyhow::bail;
+use near_crypto::{ParseKeyError, PublicKey};
 use near_network_primitives::time;
 use near_network_primitives::types::{
     Blacklist, KnownPeerState, KnownPeerStatus, PeerInfo, ReasonForBan,
@@ -11,6 +12,7 @@ use rand::thread_rng;
 use std::collections::hash_map::{Entry, Iter};
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::env;
 use std::net::SocketAddr;
 use std::ops::Not;
 use tracing::{debug, error, info};
@@ -19,6 +21,33 @@ use tracing::{debug, error, info};
 #[path = "peer_store_test.rs"]
 mod test;
 
+mod tests {
+    use super::get_preferred_peers;
+    use std::env;
+
+    #[test]
+    fn test_preferred_peers() {
+        env::set_var("PREFERRED_PEERS", "127.0.0.1:1223,ed25519:4a8iuv3kNb4z1XoehCoWkzs2SVDS8Rg1KFeMLteuXvD2 127.0.0.2:2345,ed25519:3u5YHHPVhEgnqaM2WwMQcvb7KvAZPRvshmrzuigqcW8F");
+
+        let peers = get_preferred_peers("PREFERRED_PEERS");
+        assert_eq!(peers.len(), 2);
+        assert_eq!(peers[0].id.to_string(), "ed25519:4a8iuv3kNb4z1XoehCoWkzs2SVDS8Rg1KFeMLteuXvD2");
+        assert_eq!(peers[0].addr.unwrap().to_string(), "127.0.0.1:1223");
+        assert_eq!(peers[1].id.to_string(), "ed25519:3u5YHHPVhEgnqaM2WwMQcvb7KvAZPRvshmrzuigqcW8F");
+        assert_eq!(peers[1].addr.unwrap().to_string(), "127.0.0.2:2345");
+    }
+
+    #[test]
+    fn test_broken_preferred_peers() {
+        env::set_var("BROKEN_PREFERRED_PEERS", 
+       "127.0.0.2:2345,ed25519:3u5YHHPVhEgnqaM2WwMQcvb7KvAZPRvshmrzuigqcW8F 127.0.0.1:1223,ed25519:invalidinvalidinvalidinvalidinvalidinvalid 444.444.444.444,ed25519:3u5YHHPVhEgnqaM2WwMQcvb7KvAZPRvshmrzuigqcW8F");
+
+        let peers = get_preferred_peers("BROKEN_PREFERRED_PEERS");
+        assert_eq!(peers.len(), 1);
+        assert_eq!(peers[0].id.to_string(), "ed25519:3u5YHHPVhEgnqaM2WwMQcvb7KvAZPRvshmrzuigqcW8F");
+        assert_eq!(peers[0].addr.unwrap().to_string(), "127.0.0.2:2345");
+    }
+}
 /// Level of trust we have about a new (PeerId, Addr) pair.
 #[derive(Eq, PartialEq, Debug, Clone)]
 enum TrustLevel {
@@ -484,4 +513,40 @@ where
     for x in store::Store::from(store).list_peer_states().unwrap() {
         f(x)
     }
+}
+
+pub fn get_preferred_peers(env_var: &str) -> Vec<PeerInfo> {
+    let mut out: Vec<PeerInfo> = vec![];
+
+    match env::var(env_var) {
+        Ok(nodes) => {
+            for node in nodes.split(" ") {
+                let node_parts = node.split(",").collect::<Vec<&str>>();
+                if node_parts.len() != 2 {
+                    continue;
+                };
+                let addr = node_parts[0];
+                let key = node_parts[1];
+                let pubkey_res: Result<PublicKey, ParseKeyError> = key.parse();
+                match pubkey_res {
+                    Ok(pubkey) => {
+                        let peer = PeerInfo {
+                            id: PeerId::new(pubkey),
+                            addr: match addr.parse() {
+                                Ok(socket_addr) => Some(socket_addr),
+                                Err(_e) => None,
+                            },
+                            account_id: None,
+                        };
+                        if peer.addr.is_some() {
+                            out.push(peer);
+                        }
+                    }
+                    Err(_e) => continue,
+                }
+            }
+        }
+        Err(_e) => {}
+    }
+    return out;
 }

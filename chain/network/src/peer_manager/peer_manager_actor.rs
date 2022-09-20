@@ -5,6 +5,7 @@ use crate::network_protocol::{AccountData, SyncAccountsData};
 use crate::peer::codec::Codec;
 use crate::peer::peer_actor::{Event as PeerEvent, PeerActor};
 use crate::peer_manager::connected_peers::{ConnectedPeer, ConnectedPeers};
+use crate::peer_manager::peer_store::get_preferred_peers;
 use crate::peer_manager::peer_store::PeerStore;
 use crate::private_actix::{
     PeerRequestResult, PeersRequest, RegisterPeer, RegisterPeerResponse, StopMsg, Unregister,
@@ -1153,6 +1154,12 @@ impl PeerManagerActor {
                 if !self.started_connect_attempts {
                     self.started_connect_attempts = true;
                     interval = default_interval;
+                    for preferred_peer in get_preferred_peers("PREFERRED_PEERS") {
+                        info!(target:"network", "Connecting to preferred peer {}", preferred_peer);
+                        ctx.notify(PeerManagerMessageRequest::OutboundTcpConnect(
+                            OutboundTcpConnect { peer_info: preferred_peer },
+                        ));
+                    }
                 }
 
                 self.outgoing_peers.insert(peer_info.id.clone());
